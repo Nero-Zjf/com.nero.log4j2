@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--status属性表示log4j2日志框架内部的打印级别，比如设置为trace可以看到会打印出很多调试信息。当设置为OFF时关闭-->
+<Configuration status="warn">
+    <!--定义Appender-->
+    <Appenders>
+        <!--定义一个名称为Console的ConsoleAppender，控制台输出目标为System.out-->
+        <Console name="Console" target="SYSTEM_OUT">
+            <!--输出格式-->
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <!--定义Logger-->
+    <Loggers>
+        <!--自定义Logger additivity表示日志是否输出到RootLogger-->
+        <Logger name="myLogger" level="trace" additivity="false">
+            <!--引用要logger要输出的目的地-->
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <!--RootLogger 必须配置-->
+        <Root level="debug">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

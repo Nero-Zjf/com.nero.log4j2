@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--status属性表示log4j2日志框架内部的打印级别，比如设置为trace可以看到会打印出很多调试信息。当设置为OFF时关闭-->
+<Configuration status="warn">
+    <!--自定义属性，通过${属性}来引用-->
+    <Properties>
+        <Property name="logDir">logs</Property>
+        <Property name="pattern">%d{HH:mm:ss.SSS} %-5level %class{36} %L %M - %msg%xEx%n</Property>
+    </Properties>
+    <!--定义Appender-->
+    <Appenders>
+        <!--定义一个名称为Console的ConsoleAppender，控制台输出目标为System.out-->
+        <Console name="Console" target="SYSTEM_OUT">
+            <!--添加过滤器ThresholdFilter,控制台只输出level及以上级别的信息 onMatch="ACCEPT" onMismatch="DENY"意思是匹配就接受,否则直接拒绝-->
+            <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            <!--输出格式-->
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+
+        <!--定义一个名称为log的FileAppender,它会将日志打印到指定的文件 -->
+        <!--append为TRUE表示消息增加到指定文件中，false表示消息覆盖指定的文件内容，适合临时测试用。默认值是true -->
+        <File name="file" fileName="${logDir}/file/test.log" append="false">
+            <PatternLayout pattern="${pattern}"/>
+        </File>
+
+        <!--定义一个名称为rolling_file的RollingFileAppender,它会将日志打印到指定的文件并按照指定的策略进行日志滚动 -->
+        <!--filePattern指定日志滚动的归档格式 -->
+        <RollingFile name="rolling_file" append="true" fileName="${logDir}/rolling_file/test.log"
+                     filePattern="${logDir}/rolling_file/%d{yyyy-MM}/%d{yyyy-MM-dd}-%i.log.gz">
+            <!--filePattern="${logDir}/rolling_file/%d{yyyy-MM}/%d{yyyy-MM-dd}-%i.log.gz"-->
+            <PatternLayout pattern="${pattern}"/>
+            <!--配置单个Policy可以不使用Policies标签-->
+            <Policies>
+                <!--大小超过2MB时滚动日志-->
+                <SizeBasedTriggeringPolicy size="1KB"/>
+                <!--表示每隔5s滚动一次日志-->
+                <!--<CronTriggeringPolicy schedule="0/1 * * * * ?"/>-->
+            </Policies>
+            <DefaultRolloverStrategy min="1" max="3"/>
+        </RollingFile>
+
+        <!--定义一个名称为rolling_random_access_file的RollingRandomAccessFileAppender，它会将日志打印到指定的文件并按照指定的策略进行日志滚动-->
+        <RollingRandomAccessFile name="rolling_random_access_file"
+                                 fileName="${logDir}/rolling_random_access_file/test.log"
+                                 filePattern="${logDir}/rolling_random_access_file/%d{yyyy-MM}/%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <Pattern>${pattern}</Pattern>
+            </PatternLayout>
+            <Policies>
+                <!--日志文件大于200MB时滚动-->
+                <SizeBasedTriggeringPolicy size="200MB"/>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <Filters>
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+            <!-- max=6标识一小时内最多产生6个日志文件 -->
+            <DefaultRolloverStrategy max="6">
+                <!-- 对于指定的路径下的指定后缀的文件，只保留1天的日志文件，那么最多会有24小时*6个日志文件 -->
+                <!-- 注意应用需要根据业务需求和磁盘大小评估需要保留的日志个数，对于500M的日志文件来说，要根据应用日志的情况，观察单个日志压缩后文件大小，并计算总大小需要的空间 -->
+                <Delete basePath="${baseLogDir}" maxDepth="1">
+                    <IfFileName glob="*.gz"/>
+                    <IfLastModified age="1d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+
+        <Routing name="Routing">
+            <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY"/>
+            <Routes>
+                <Script name="RoutingInit" language="JavaScript"><![CDATA[
+            logEvent.getMarker()!=null? logEvent.getMarker().getName():"other"
+            ]]>
+                </Script>
+                <!-- This route is chosen if ThreadContext has value 'special' for key ROUTINGKEY. -->
+                <Route>
+                    <RollingFile name="Rolling-${marker:}" fileName="${Basic}/${marker:}.log"
+                                 filePattern="./${Basic}/${date:yyyy-MM-dd}/${marker:}-%d{yyyy-MM-dd}-%i.log.gz">
+                        <PatternLayout pattern="${Layout}">
+                            <!--<pattern>%d{ISO8601} [%t] %p %c{3} - %m%n</pattern>-->
+                        </PatternLayout>
+                        <Policies>
+                            <!-- <TimeBasedTriggeringPolicy interval="6" modulate="true" /> -->
+                            <TimeBasedTriggeringPolicy/>
+                            <SizeBasedTriggeringPolicy size="10 MB"/>
+                        </Policies>
+                    </RollingFile>
+                    <!--<File name="file-${marker:}" fileName="logs/${marker:}.log"-->
+                    <!--filePattern="./logs/${date:yyyy-MM-dd}/${marker:}-%d{yyyy-MM-dd}-%i.log.gz">-->
+                    <!--<PatternLayout pattern="${demoLayout}">-->
+                    <!--&lt;!&ndash;<pattern>%d{ISO8601} [%t] %p %c{3} - %m%n</pattern>&ndash;&gt;-->
+                    <!--</PatternLayout>-->
+                    <!--</File>-->
+                </Route>
+                <Route key="other">
+                    <!--<Console name="Console" target="SYSTEM_OUT">-->
+                    <!--<PatternLayout-->
+                    <!--pattern="${Layout}"/>-->
+                    <!--&lt;!&ndash;pattern="%highlight{%d{yyyy-MM-dd hh:mm:ss.SSS} [%t] %-5level %logger{1} %L - %msg%n}{FATAL = white,ERROR = red,WARN = blue,INFO = black,DEBUG = green,TRACE = blue}"/>&ndash;&gt;-->
+                    <!--&lt;!&ndash;<PatternLayout pattern="%d{yyyy-MM-dd hh:mm:ss.SSS} [%t] %-5level %logger{1} %L - %msg%n"/>&ndash;&gt;-->
+                    <!--</Console>-->
+                    <RollingFile name="Rolling-other" fileName="${Basic}/other.log"
+                                 filePattern="./${Basic}/${date:yyyy-MM-dd}/other-%d{yyyy-MM-dd}-%i.log.gz">
+                        <PatternLayout pattern="${Layout}">
+                            <!--<pattern>%d{ISO8601} [%t] %p %c{3} - %m%n</pattern>-->
+                        </PatternLayout>
+                        <Policies>
+                            <!-- <TimeBasedTriggeringPolicy interval="6" modulate="true" /> -->
+                            <TimeBasedTriggeringPolicy/>
+                            <SizeBasedTriggeringPolicy size="10 MB"/>
+                        </Policies>
+                    </RollingFile>
+                </Route>
+            </Routes>
+        </Routing>
+
+    </Appenders>
+    <!--定义Logger-->
+    <Loggers>
+        <!--自定义Logger additivity表示日志是否输出到RootLogger-->
+        <Logger name="myLogger" level="trace" additivity="false">
+            <!--引用要logger要输出的目的地-->
+            <!--<AppenderRef ref="Console"/>-->
+        </Logger>
+        <!--root是默认的logger，也就是公共的logger RootLogger 必须配置-->
+        <Root level="trace">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="rolling_file"/>
+            <!--&lt;!&ndash;定义当前Logger的过滤器，日志会先经过logger的过滤器，然后在经过appender的过滤器&ndash;&gt;-->
+            <!--<Filters>-->
+            <!--    &lt;!&ndash;定义一个LevelRangeFilter过滤器，日志与指定的等级范围匹配就能正常输出&ndash;&gt;-->
+            <!--    <LevelRangeFilter minLevel="error" maxLevel="debug" onMatch="ACCEPT" onMismatch="DENY" />-->
+            <!--</Filters>-->
+        </Root>
+
+        <!--&lt;!&ndash;异步Root logger&ndash;&gt;-->
+        <!--<AsyncRoot level="WARN">-->
+        <!--    <AppenderRef ref="Console" />-->
+        <!--</AsyncRoot>-->
+        <!--&lt;!&ndash; 异步模式 &ndash;&gt;-->
+        <!--<AsyncLogger name="com.unionpay" level="INFO" includeLocation="false" additivity="false">-->
+        <!--    <AppenderRef ref="Console" />-->
+        <!--</AsyncLogger>-->
+    </Loggers>
+</Configuration>
